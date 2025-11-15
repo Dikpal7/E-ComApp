@@ -1,4 +1,4 @@
-package com.msexample.order_service.entity;
+package com.msexample.orderservice.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

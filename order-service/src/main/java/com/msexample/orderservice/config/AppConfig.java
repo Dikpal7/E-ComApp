@@ -1,9 +1,8 @@
-package com.msexample.order_service.config;
+package com.msexample.orderservice.config;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 
 @Component

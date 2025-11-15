@@ -39,7 +39,7 @@ public class ProductController {
     public ResponseEntity<?> reserve(@PathVariable Long id, @RequestBody Map<String,Integer> body){
         int qty = body.getOrDefault("quantity", 1);
         Product p = repo.findById(id).orElseThrow();
-        if(p.getStock() < qty) return ResponseEntity.status(HttpStatus.CONFLICT).body("Insufficient stock");
+        if(p.getStock() < qty) return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Insufficient stock"));
         p.setStock(p.getStock() - qty);
         repo.save(p);
         return ResponseEntity.ok(p);

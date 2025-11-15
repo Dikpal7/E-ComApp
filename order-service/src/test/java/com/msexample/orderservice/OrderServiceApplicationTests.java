@@ -1,4 +1,4 @@
-package com.msexample.order_service;
+package com.msexample.orderservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

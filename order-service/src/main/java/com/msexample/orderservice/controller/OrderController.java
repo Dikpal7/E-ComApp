@@ -1,7 +1,12 @@
-package com.msexample.order_service.controller;
+package com.msexample.orderservice.controller;
 
-import com.msexample.order_service.entity.Order;
-import com.msexample.order_service.repository.OrderRepository;
+import com.msexample.orderservice.client.ProductClient;
+import com.msexample.orderservice.client.UserClient;
+import com.msexample.orderservice.entity.Order;
+import com.msexample.orderservice.entity.ProductDTO;
+import com.msexample.orderservice.entity.UserDTO;
+import com.msexample.orderservice.repository.OrderRepository;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +25,8 @@ import java.util.stream.Collectors;
 public class OrderController {
     private final OrderRepository orderRepo;
     private final RestTemplate restTemplate;
+    private final UserClient userClient;
+    private final ProductClient productClient;
 
     private final String USER_SERVICE = "http://localhost:8081/users";
     private final String PRODUCT_SERVICE = "http://localhost:8082/products";
@@ -32,8 +39,11 @@ public class OrderController {
 
         // 1) Verify user exists
         try {
-            ResponseEntity<Map> userResp = restTemplate.getForEntity(USER_SERVICE + "/" + userId, Map.class);
-            if(!userResp.getStatusCode().is2xxSuccessful()) return ResponseEntity.badRequest().body("User invalid");
+//            ResponseEntity<Map> userResp = restTemplate.getForEntity(USER_SERVICE + "/" + userId, Map.class);
+            UserDTO user = userClient.getUserById(userId);
+            if (user == null) {
+                return ResponseEntity.badRequest().body("User not found");
+            }
         } catch (HttpClientErrorException e){
             return ResponseEntity.badRequest().body("User not found");
         }
@@ -41,12 +51,8 @@ public class OrderController {
         // 2) Reserve product stock
         Map<String,Integer> body = Map.of("quantity", qty);
         try {
-            ResponseEntity<Map> reserveResp = restTemplate.postForEntity(PRODUCT_SERVICE + "/" + productId + "/reserve", body, Map.class);
-            if(!reserveResp.getStatusCode().is2xxSuccessful()){
-                return ResponseEntity.status(HttpStatus.CONFLICT).body("Insufficient stock");
-            }
-            Map prod = reserveResp.getBody();
-            double price = Double.parseDouble(prod.get("price").toString());
+            ProductDTO prod = productClient.reserveProduct(productId, body);
+            double price = prod.getPrice();
             double total = price * qty;
             Order order = Order.builder()
                     .userId(userId)
@@ -62,10 +68,17 @@ public class OrderController {
             resp.put("order", saved);
             resp.put("product", prod);
             // fetch user details
-            ResponseEntity<Map> userDetails = restTemplate.getForEntity(USER_SERVICE + "/" + userId, Map.class);
-            resp.put("user", userDetails.getBody());
+            UserDTO user = userClient.getUserById(userId);
+            resp.put("user", user);
             return ResponseEntity.ok(resp);
 
+        }catch (FeignException.Conflict e) {
+            // same as 409 CONFLICT (Insufficient stock)
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Insufficient stock");
+        } catch (FeignException.NotFound e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Product not found");
+        } catch (FeignException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Product service error from FeignException");
         } catch (HttpClientErrorException.Conflict e){
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Insufficient stock");
         } catch (Exception e){
